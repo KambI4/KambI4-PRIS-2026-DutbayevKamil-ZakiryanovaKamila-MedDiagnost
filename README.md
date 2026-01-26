@@ -1,0 +1,1 @@
+# KambI4-PRIS-2026-DutbayevKamil-ZakiryanovaKamila-MedDiagnost
