@@ -1,0 +1,12 @@
+{
+  "scenario_name": "Первичный медицинский осмотр",
+  "thresholds": {
+    "max_temperature": 39.0
+  },
+  "lists": {
+    "danger_symptoms": ["потеря сознания", "судороги"]
+  },
+  "critical_rules": {
+    "must_be_registered": true
+  }
+}
