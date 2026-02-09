@@ -1,18 +1,42 @@
+# src/main.py
 import streamlit as st
-from mock_data import test_entity
-from logic import check_rules
+import matplotlib.pyplot as plt
+import networkx as nx
 
-st.title("🩺 Медицинский диагност")
+from knowledge_graph import create_graph, find_related_entities
 
-temperature = st.number_input("Температура", value=test_entity["temperature"])
-is_registered = st.checkbox("Пациент зарегистрирован", value=test_entity["is_registered"])
+st.title("Medical Knowledge Graph 🩺")
 
-if st.button("Проверить"):
-    data = {
-        "temperature": temperature,
-        "is_registered": is_registered,
-        "complaint_text": test_entity["complaint_text"],
-        "symptoms": test_entity["symptoms"]
-    }
+# Загружаем граф
+G = create_graph()
 
-    st.write(check_rules(data))
+# Выбор узла
+all_nodes = list(G.nodes())
+selected_node = st.selectbox("Выберите симптом, болезнь или лекарство:", all_nodes)
+
+# Поиск связей
+if st.button("Найти связи"):
+    results = find_related_entities(G, selected_node)
+    if results:
+        st.success(f"Связанные объекты: {', '.join(results)}")
+    else:
+        st.warning("Связей не найдено")
+
+# Визуализация графа
+st.write("### Визуализация графа знаний")
+
+fig, ax = plt.subplots(figsize=(8, 6))
+pos = nx.spring_layout(G)
+
+nx.draw(
+    G,
+    pos,
+    with_labels=True,
+    node_size=2000,
+    node_color="lightblue",
+    edge_color="gray",
+    font_size=10,
+    ax=ax
+)
+
+st.pyplot(fig)
