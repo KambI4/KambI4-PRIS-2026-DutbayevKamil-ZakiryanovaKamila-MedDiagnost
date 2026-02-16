@@ -83,6 +83,36 @@ def _find_nodes_in_query(query, alias_index):
     return found
 
 
+def _best_fuzzy_node(value, alias_index, cutoff=0.82):
+    matches = get_close_matches(value, list(alias_index.keys()), n=1, cutoff=cutoff)
+    if matches:
+        return alias_index[matches[0]]
+    return None
+
+
+def _extract_candidates(query):
+    query_norm = _normalize_text(query)
+    tokens = re.findall(r"[a-zA-Zа-яА-Я0-9]+", query_norm)
+    candidates = [query_norm]
+    candidates.extend(tokens)
+
+    # Add short phrases from neighboring tokens: e.g. "болит голова"
+    for i in range(len(tokens)):
+        if i + 1 < len(tokens):
+            candidates.append(f"{tokens[i]} {tokens[i + 1]}")
+        if i + 2 < len(tokens):
+            candidates.append(f"{tokens[i]} {tokens[i + 1]} {tokens[i + 2]}")
+
+    # Preserve order and uniqueness
+    seen = set()
+    uniq = []
+    for candidate in candidates:
+        if candidate not in seen:
+            seen.add(candidate)
+            uniq.append(candidate)
+    return uniq
+
+
 def _suggest_nodes(query, alias_index):
     query_norm = _normalize_text(query)
     alias_keys = list(alias_index.keys())
@@ -114,6 +144,15 @@ def process_text_message(text, data_source):
 
     alias_index = _build_alias_index(data_source)
     matched_nodes = _find_nodes_in_query(query, alias_index)
+
+    # Fuzzy auto-resolve: accept misspelled terms as valid input.
+    if not matched_nodes:
+        fuzzy_found = []
+        for candidate in _extract_candidates(query):
+            node = _best_fuzzy_node(candidate, alias_index, cutoff=0.82)
+            if node and node not in fuzzy_found:
+                fuzzy_found.append(node)
+        matched_nodes = fuzzy_found
 
     if matched_nodes:
         if len(matched_nodes) == 1:
