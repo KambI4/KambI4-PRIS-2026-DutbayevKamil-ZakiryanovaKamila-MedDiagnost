@@ -1,42 +1,41 @@
-# src/main.py
-import streamlit as st
-import matplotlib.pyplot as plt
-import networkx as nx
+﻿import streamlit as st
 
-from knowledge_graph import create_graph, find_related_entities
+from knowledge_graph import load_graph
+from logic import process_text_message
 
-st.title("Medical Knowledge Graph 🩺")
+st.set_page_config(page_title="MedDiagnost Chat", page_icon="🩺")
+st.title("Медицинский чат-ассистент")
+st.caption("Поддерживаются русские и английские названия (например: 'кашель', 'cough', 'flu').")
 
-# Загружаем граф
-G = create_graph()
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# Выбор узла
-all_nodes = list(G.nodes())
-selected_node = st.selectbox("Выберите симптом, болезнь или лекарство:", all_nodes)
+if "graph" not in st.session_state:
+    st.session_state.graph = load_graph()
 
-# Поиск связей
-if st.button("Найти связи"):
-    results = find_related_entities(G, selected_node)
-    if results:
-        st.success(f"Связанные объекты: {', '.join(results)}")
-    else:
-        st.warning("Связей не найдено")
+graph = st.session_state.graph
 
-# Визуализация графа
-st.write("### Визуализация графа знаний")
+disease_nodes = sorted([n for n, attrs in graph.nodes(data=True) if attrs.get("type") == "disease"])
+symptom_nodes = sorted([n for n, attrs in graph.nodes(data=True) if attrs.get("type") == "symptom"])
+medicine_nodes = sorted([n for n, attrs in graph.nodes(data=True) if attrs.get("type") == "medicine"])
 
-fig, ax = plt.subplots(figsize=(8, 6))
-pos = nx.spring_layout(G)
+with st.expander("Подсказки по вводу"):
+    st.markdown("Примеры: `кашель`, `cough`, `грипп`, `flu`, `covid`, `болит голова`")
+    st.markdown(f"Болезни: {', '.join(disease_nodes)}")
+    st.markdown(f"Симптомы: {', '.join(symptom_nodes)}")
+    st.markdown(f"Лекарства: {', '.join(medicine_nodes)}")
 
-nx.draw(
-    G,
-    pos,
-    with_labels=True,
-    node_size=2000,
-    node_color="lightblue",
-    edge_color="gray",
-    font_size=10,
-    ax=ax
-)
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-st.pyplot(fig)
+if user_input := st.chat_input("Введите симптом, болезнь или лекарство..."):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    bot_response = process_text_message(user_input, graph)
+
+    st.session_state.messages.append({"role": "assistant", "content": bot_response})
+    with st.chat_message("assistant"):
+        st.markdown(bot_response)

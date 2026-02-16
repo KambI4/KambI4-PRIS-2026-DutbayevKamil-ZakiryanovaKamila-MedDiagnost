@@ -1,4 +1,7 @@
-data/
+# Keep required seed data for app startup under version control.
+# If you have large/generated data, ignore only those subfolders.
+data/tmp/
+data/processed/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,34 +1,36 @@
-# src/knowledge_graph.py
-import networkx as nx
+﻿import networkx as nx
 
-def create_graph():
-    G = nx.Graph()
+from models import Disease
 
-    # --- Узлы ---
-    diseases = ["Flu", "Covid", "Cold"]
-    symptoms = ["Fever", "Cough", "Headache"]
-    medicines = ["Paracetamol", "Ibuprofen"]
 
-    G.add_nodes_from(diseases, type="disease")
-    G.add_nodes_from(symptoms, type="symptom")
-    G.add_nodes_from(medicines, type="medicine")
+def create_graph(diseases=None):
+    graph = nx.Graph()
 
-    # --- Связи ---
-    relationships = [
-        ("Flu", "Fever"),
-        ("Flu", "Cough"),
-        ("Flu", "Paracetamol"),
+    if diseases is None:
+        diseases = [
+            Disease("Грипп", ["Температура", "Кашель", "Слабость"], ["Парацетамол"]),
+            Disease("COVID-19", ["Температура", "Головная боль", "Слабость"], ["Противовирусные"]),
+            Disease("Простуда", ["Кашель", "Слабость"], ["Ибупрофен"]),
+        ]
 
-        ("Covid", "Fever"),
-        ("Covid", "Headache"),
+    symptom_nodes = sorted({symptom for d in diseases for symptom in d.symptoms})
+    medicine_nodes = sorted({medicine for d in diseases for medicine in d.medicines})
 
-        ("Cold", "Cough"),
-        ("Cold", "Ibuprofen")
-    ]
+    graph.add_nodes_from((d.name for d in diseases), type="disease")
+    graph.add_nodes_from(symptom_nodes, type="symptom")
+    graph.add_nodes_from(medicine_nodes, type="medicine")
 
-    G.add_edges_from(relationships)
+    relationships = []
+    for disease in diseases:
+        relationships.extend((disease.name, symptom) for symptom in disease.symptoms)
+        relationships.extend((disease.name, medicine) for medicine in disease.medicines)
 
-    return G
+    graph.add_edges_from(relationships)
+    return graph
+
+
+def load_graph():
+    return create_graph()
 
 
 def find_related_entities(graph, node):
