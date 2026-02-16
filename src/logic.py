@@ -21,7 +21,7 @@ ALIASES_BY_CANONICAL = {
 
 
 def load_rules():
-    # Fallback defaults let the app start even if data/raw/rules.json is absent.
+    # Значения по умолчанию, чтобы приложение не падало без rules.json.
     default_rules = {
         "critical_rules": {"must_be_registered": False},
         "thresholds": {"max_temperature": 39.0},
@@ -38,7 +38,7 @@ def load_rules():
 def check_rules(data):
     rules = load_rules()
 
-    # HARD FILTER
+    # Критическая проверка.
     if rules["critical_rules"]["must_be_registered"] and not data["is_registered"]:
         return "Пациент не зарегистрирован"
 
@@ -96,14 +96,14 @@ def _extract_candidates(query):
     candidates = [query_norm]
     candidates.extend(tokens)
 
-    # Add short phrases from neighboring tokens: e.g. "болит голова"
+    # Добавляем короткие фразы из соседних слов (например, "болит голова").
     for i in range(len(tokens)):
         if i + 1 < len(tokens):
             candidates.append(f"{tokens[i]} {tokens[i + 1]}")
         if i + 2 < len(tokens):
             candidates.append(f"{tokens[i]} {tokens[i + 1]} {tokens[i + 2]}")
 
-    # Preserve order and uniqueness
+    # Сохраняем порядок и уникальность.
     seen = set()
     uniq = []
     for candidate in candidates:
@@ -145,7 +145,7 @@ def process_text_message(text, data_source):
     alias_index = _build_alias_index(data_source)
     matched_nodes = _find_nodes_in_query(query, alias_index)
 
-    # Fuzzy auto-resolve: accept misspelled terms as valid input.
+    # Нечеткое распознавание: учитываем опечатки как валидный ввод.
     if not matched_nodes:
         fuzzy_found = []
         for candidate in _extract_candidates(query):
