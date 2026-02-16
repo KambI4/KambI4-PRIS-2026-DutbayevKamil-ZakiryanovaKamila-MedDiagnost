@@ -101,13 +101,13 @@
 ## 6. Архитектура системы
 
 ```mermaid
-graph TD;
-    User[Пользователь] -->|Текстовый запрос| UI[Streamlit Chat Interface];
-    UI -->|Сообщение| Logic[process_text_message()];
-    Logic -->|Поиск по узлам и алиасам| Graph[Knowledge Graph (NetworkX)];
-    Graph -->|Связанные сущности| Logic;
-    Logic -->|Текстовый ответ| UI;
-    UI -->|История диалога| Memory[st.session_state.messages];
+graph TD
+    User["Пользователь"] -->|"Текстовый запрос"| UI["Streamlit Chat Interface"]
+    UI -->|"Сообщение"| Logic["process_text_message"]
+    Logic -->|"Поиск по узлам и алиасам"| Graph["Knowledge Graph (NetworkX)"]
+    Graph -->|"Связанные сущности"| Logic
+    Logic -->|"Текстовый ответ"| UI
+    UI -->|"История диалога"| Memory["session_state.messages"]
 ```
 
 ---
