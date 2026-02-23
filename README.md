@@ -123,4 +123,8 @@ py -m streamlit run src/main.py
 
 ```bash
 py -m pip install -r requiremence.txt
+<<<<<<< HEAD
 ```
+=======
+```
+>>>>>>> 9689ecc (Update NLP module and fix logic)

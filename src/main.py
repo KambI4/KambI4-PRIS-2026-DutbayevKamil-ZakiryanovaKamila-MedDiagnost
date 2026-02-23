@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 ﻿import streamlit as st
+=======
+import streamlit as st
+>>>>>>> 9689ecc (Update NLP module and fix logic)
 
 from knowledge_graph import load_graph
 from logic import process_text_message

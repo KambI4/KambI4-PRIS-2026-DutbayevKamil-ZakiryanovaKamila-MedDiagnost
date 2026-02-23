@@ -1,11 +1,16 @@
+<<<<<<< HEAD
 ﻿import json
 import os
 import re
 from difflib import get_close_matches
+=======
+import re
+from difflib import get_close_matches
+import spacy
+>>>>>>> 9689ecc (Update NLP module and fix logic)
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-RULES_PATH = os.path.join(BASE_DIR, 'data', 'raw', 'rules.json')
 
+<<<<<<< HEAD
 ALIASES_BY_CANONICAL = {
     "Грипп": ["грип", "flu", "influenza"],
     "COVID-19": ["covid", "covid19", "covid-19", "ковид", "ковид19", "коронавирус", "корона"],
@@ -176,3 +181,107 @@ def process_text_message(text, data_source):
         return f"Я не знаю такого термина. Возможно, вы имели в виду: {', '.join(suggestions)}."
 
     return "Я не знаю такого термина"
+=======
+# =========================
+# NLP модель
+# =========================
+
+try:
+    nlp = spacy.load("ru_core_news_sm")
+except Exception:
+    nlp = None
+
+
+# =========================
+# Дата (regex)
+# =========================
+
+MONTHS = (
+    "января|февраля|марта|апреля|мая|июня|июля|августа|"
+    "сентября|октября|ноября|декабря"
+)
+
+DATE_PATTERN = re.compile(
+    rf"\b(\d{{1,2}}\s+(?:{MONTHS}))\b",
+    re.IGNORECASE
+)
+
+
+def _extract_dates(text):
+    return DATE_PATTERN.findall(text)
+
+
+# =========================
+# Вспомогательные
+# =========================
+
+def _normalize_text(text):
+    return text.strip().lower().replace("ё", "е")
+
+
+def _extract_named_entities(text):
+    if not nlp:
+        return []
+    doc = nlp(text)
+    return [(ent.text, ent.label_) for ent in doc.ents]
+
+
+def _extract_medical_entities(text, graph):
+    if not nlp:
+        return []
+
+    doc = nlp(text.lower())
+    lemmas = [token.lemma_ for token in doc]
+
+    found = []
+
+    for node in graph.nodes:
+        node_tokens = node.lower().split()
+        if any(token in lemmas for token in node_tokens):
+            found.append(node)
+
+    return list(set(found))
+
+
+# =========================
+# Главная функция
+# =========================
+
+def process_text_message(text, graph):
+
+    query = text.strip()
+    if not query:
+        return "Введите медицинский запрос."
+
+    response_parts = []
+
+    # --- 1. NER через spaCy ---
+    ner_entities = _extract_named_entities(query)
+
+    # --- 2. DATE через regex ---
+    regex_dates = _extract_dates(query)
+    for dt in regex_dates:
+        ner_entities.append((dt, "DATE"))
+
+    if ner_entities:
+        formatted = ", ".join([f"{t} ({l})" for t, l in ner_entities])
+        response_parts.append(f"Распознаны сущности: {formatted}.")
+
+    # --- 3. Медицинские сущности ---
+    medical = _extract_medical_entities(query, graph)
+
+    if medical:
+        for node in medical:
+            neighbors = list(graph.neighbors(node))
+            if neighbors:
+                response_parts.append(
+                    f"Найдено: {node}. Связанные элементы: {', '.join(neighbors)}."
+                )
+            else:
+                response_parts.append(f"{node} найден, но связей нет.")
+
+    if response_parts:
+        return "\n".join(response_parts)
+
+    return "Я не смог распознать медицинские сущности в вашем запросе."
+>>>>>>> 9689ecc (Update NLP module and fix logic)
