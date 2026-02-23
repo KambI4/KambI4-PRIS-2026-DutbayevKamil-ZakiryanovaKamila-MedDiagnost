@@ -1,9 +1,3 @@
-<<<<<<< HEAD
-﻿import networkx as nx
-=======
-import networkx as nx
->>>>>>> 9689ecc (Update NLP module and fix logic)
-
 from models import Disease
 
 

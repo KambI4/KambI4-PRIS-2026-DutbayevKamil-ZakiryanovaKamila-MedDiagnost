@@ -1,16 +1,12 @@
-<<<<<<< HEAD
-﻿import json
+import json
 import os
 import re
 from difflib import get_close_matches
-=======
 import re
 from difflib import get_close_matches
 import spacy
->>>>>>> 9689ecc (Update NLP module and fix logic)
 
 
-<<<<<<< HEAD
 ALIASES_BY_CANONICAL = {
     "Грипп": ["грип", "flu", "influenza"],
     "COVID-19": ["covid", "covid19", "covid-19", "ковид", "ковид19", "коронавирус", "корона"],
@@ -284,4 +280,4 @@ def process_text_message(text, graph):
         return "\n".join(response_parts)
 
     return "Я не смог распознать медицинские сущности в вашем запросе."
->>>>>>> 9689ecc (Update NLP module and fix logic)
+
