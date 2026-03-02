@@ -1,3 +1,5 @@
+import networkx as nx
+
 from models import Disease
 
 

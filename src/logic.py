@@ -2,10 +2,13 @@ import json
 import os
 import re
 from difflib import get_close_matches
-import re
-from difflib import get_close_matches
+
 import spacy
 
+
+RULES_PATH = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "data", "raw", "rules.json")
+)
 
 ALIASES_BY_CANONICAL = {
     "Грипп": ["грип", "flu", "influenza"],
@@ -20,9 +23,19 @@ ALIASES_BY_CANONICAL = {
     "Противовирусные": ["антивирусные", "antiviral", "antivirals"],
 }
 
+MONTHS = (
+    "января|февраля|марта|апреля|мая|июня|июля|августа|"
+    "сентября|октября|ноября|декабря"
+)
+DATE_PATTERN = re.compile(rf"\\b(\\d{{1,2}}\\s+(?:{MONTHS}))\\b", re.IGNORECASE)
+
+try:
+    NLP = spacy.load("ru_core_news_sm")
+except Exception:
+    NLP = None
+
 
 def load_rules():
-    # Значения по умолчанию, чтобы приложение не падало без rules.json.
     default_rules = {
         "critical_rules": {"must_be_registered": False},
         "thresholds": {"max_temperature": 39.0},
@@ -32,21 +45,20 @@ def load_rules():
     if not os.path.exists(RULES_PATH):
         return default_rules
 
-    with open(RULES_PATH, 'r', encoding='utf-8') as f:
+    with open(RULES_PATH, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
 def check_rules(data):
     rules = load_rules()
 
-    # Критическая проверка.
-    if rules["critical_rules"]["must_be_registered"] and not data["is_registered"]:
+    if rules["critical_rules"]["must_be_registered"] and not data.get("is_registered", False):
         return "Пациент не зарегистрирован"
 
-    if data["temperature"] > rules["thresholds"]["max_temperature"]:
+    if data.get("temperature", 0) > rules["thresholds"]["max_temperature"]:
         return "Очень высокая температура"
 
-    for symptom in data["symptoms"]:
+    for symptom in data.get("symptoms", []):
         if symptom in rules["lists"]["danger_symptoms"]:
             return f"Опасный симптом: {symptom}"
 
@@ -97,14 +109,12 @@ def _extract_candidates(query):
     candidates = [query_norm]
     candidates.extend(tokens)
 
-    # Добавляем короткие фразы из соседних слов (например, "болит голова").
     for i in range(len(tokens)):
         if i + 1 < len(tokens):
             candidates.append(f"{tokens[i]} {tokens[i + 1]}")
         if i + 2 < len(tokens):
             candidates.append(f"{tokens[i]} {tokens[i + 1]} {tokens[i + 2]}")
 
-    # Сохраняем порядок и уникальность.
     seen = set()
     uniq = []
     for candidate in candidates:
@@ -128,109 +138,25 @@ def _suggest_nodes(query, alias_index):
     return suggestions[:3]
 
 
-def process_text_message(text, data_source):
-    """
-    Принимает текст пользователя, ищет узлы в графе знаний
-    и возвращает текстовый ответ.
-    """
-    query = text.strip()
-
-    if not query:
-        return "Введите запрос, например: 'кашель' или 'грипп'."
-
-    query_norm = _normalize_text(query)
-
-    if "привет" in query_norm or "hello" in query_norm:
-        return "Привет! Можете писать по-русски или по-английски: например, 'кашель', 'cough', 'flu'."
-
-    alias_index = _build_alias_index(data_source)
-    matched_nodes = _find_nodes_in_query(query, alias_index)
-
-    # Нечеткое распознавание: учитываем опечатки как валидный ввод.
-    if not matched_nodes:
-        fuzzy_found = []
-        for candidate in _extract_candidates(query):
-            node = _best_fuzzy_node(candidate, alias_index, cutoff=0.82)
-            if node and node not in fuzzy_found:
-                fuzzy_found.append(node)
-        matched_nodes = fuzzy_found
-
-    if matched_nodes:
-        if len(matched_nodes) == 1:
-            target_node = matched_nodes[0]
-            neighbors = list(data_source.neighbors(target_node))
-            if neighbors:
-                return f"Я нашел '{target_node}' в базе. С этим связано: {', '.join(map(str, neighbors))}."
-            return f"Я нашел '{target_node}' в базе, но у него пока нет связей."
-
-        lines = [f"В запросе найдено несколько терминов: {', '.join(matched_nodes)}."]
-        for node in matched_nodes:
-            neighbors = list(data_source.neighbors(node))
-            if neighbors:
-                lines.append(f"{node}: {', '.join(map(str, neighbors))}.")
-            else:
-                lines.append(f"{node}: пока нет связей.")
-        return "\n".join(lines)
-
-    suggestions = _suggest_nodes(query, alias_index)
-    if suggestions:
-        return f"Я не знаю такого термина. Возможно, вы имели в виду: {', '.join(suggestions)}."
-
-    return "Я не знаю такого термина"
-=======
-# =========================
-# NLP модель
-# =========================
-
-try:
-    nlp = spacy.load("ru_core_news_sm")
-except Exception:
-    nlp = None
-
-
-# =========================
-# Дата (regex)
-# =========================
-
-MONTHS = (
-    "января|февраля|марта|апреля|мая|июня|июля|августа|"
-    "сентября|октября|ноября|декабря"
-)
-
-DATE_PATTERN = re.compile(
-    rf"\b(\d{{1,2}}\s+(?:{MONTHS}))\b",
-    re.IGNORECASE
-)
-
-
 def _extract_dates(text):
     return DATE_PATTERN.findall(text)
 
 
-# =========================
-# Вспомогательные
-# =========================
-
-def _normalize_text(text):
-    return text.strip().lower().replace("ё", "е")
-
-
 def _extract_named_entities(text):
-    if not nlp:
+    if not NLP:
         return []
-    doc = nlp(text)
+    doc = NLP(text)
     return [(ent.text, ent.label_) for ent in doc.ents]
 
 
 def _extract_medical_entities(text, graph):
-    if not nlp:
+    if not NLP:
         return []
 
-    doc = nlp(text.lower())
+    doc = NLP(text.lower())
     lemmas = [token.lemma_ for token in doc]
 
     found = []
-
     for node in graph.nodes:
         node_tokens = node.lower().split()
         if any(token in lemmas for token in node_tokens):
@@ -239,45 +165,72 @@ def _extract_medical_entities(text, graph):
     return list(set(found))
 
 
-# =========================
-# Главная функция
-# =========================
-
 def process_text_message(text, graph):
-
     query = text.strip()
+
     if not query:
-        return "Введите медицинский запрос."
+        return "Введите запрос, например: 'кашель' или 'грипп'."
+
+    query_norm = _normalize_text(query)
+    if "привет" in query_norm or "hello" in query_norm:
+        return "Привет! Можете писать по-русски или по-английски: например, 'кашель', 'cough', 'flu'."
+
+    alias_index = _build_alias_index(graph)
+    matched_nodes = _find_nodes_in_query(query, alias_index)
+
+    if not matched_nodes:
+        fuzzy_found = []
+        for candidate in _extract_candidates(query):
+            node = _best_fuzzy_node(candidate, alias_index, cutoff=0.82)
+            if node and node not in fuzzy_found:
+                fuzzy_found.append(node)
+        matched_nodes = fuzzy_found
 
     response_parts = []
 
-    # --- 1. NER через spaCy ---
     ner_entities = _extract_named_entities(query)
-
-    # --- 2. DATE через regex ---
-    regex_dates = _extract_dates(query)
-    for dt in regex_dates:
+    for dt in _extract_dates(query):
         ner_entities.append((dt, "DATE"))
 
     if ner_entities:
         formatted = ", ".join([f"{t} ({l})" for t, l in ner_entities])
         response_parts.append(f"Распознаны сущности: {formatted}.")
 
-    # --- 3. Медицинские сущности ---
-    medical = _extract_medical_entities(query, graph)
+    nlp_medical = _extract_medical_entities(query, graph)
+    if nlp_medical:
+        for node in sorted(nlp_medical):
+            if node not in matched_nodes:
+                matched_nodes.append(node)
 
-    if medical:
-        for node in medical:
-            neighbors = list(graph.neighbors(node))
+    if matched_nodes:
+        if len(matched_nodes) == 1:
+            target_node = matched_nodes[0]
+            neighbors = list(graph.neighbors(target_node))
             if neighbors:
                 response_parts.append(
-                    f"Найдено: {node}. Связанные элементы: {', '.join(neighbors)}."
+                    f"Я нашел '{target_node}' в базе. С этим связано: {', '.join(map(str, neighbors))}."
                 )
             else:
-                response_parts.append(f"{node} найден, но связей нет.")
+                response_parts.append(f"Я нашел '{target_node}' в базе, но у него пока нет связей.")
+        else:
+            response_parts.append(f"В запросе найдено несколько терминов: {', '.join(matched_nodes)}.")
+            for node in matched_nodes:
+                neighbors = list(graph.neighbors(node))
+                if neighbors:
+                    response_parts.append(f"{node}: {', '.join(map(str, neighbors))}.")
+                else:
+                    response_parts.append(f"{node}: пока нет связей.")
+
+        return "\n".join(response_parts)
+
+    suggestions = _suggest_nodes(query, alias_index)
+    if suggestions:
+        response_parts.append(
+            f"Я не знаю такого термина. Возможно, вы имели в виду: {', '.join(suggestions)}."
+        )
+        return "\n".join(response_parts)
 
     if response_parts:
         return "\n".join(response_parts)
 
-    return "Я не смог распознать медицинские сущности в вашем запросе."
-
+    return "Я не знаю такого термина"
