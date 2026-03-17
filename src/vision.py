@@ -7,6 +7,8 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
+from similarity import recommend_similar_medical_objects
+
 try:
     import cv2
 except Exception:
@@ -248,6 +250,7 @@ def analyze_image_bytes(image_bytes: bytes) -> dict[str, Any]:
     image_bgr = _decode_image(image_bytes)
     ocr = _extract_ocr(image_bgr)
     classification = _classify_image(image_bgr, ocr["text"])
+    recommendations = recommend_similar_medical_objects(classification, ocr["text"])
     medical_extraction = _extract_medical_entities_from_ocr(ocr["text"]) if ocr["available"] else {
         "diagnosis_candidates": [],
         "icd_codes": [],
@@ -258,6 +261,7 @@ def analyze_image_bytes(image_bytes: bytes) -> dict[str, Any]:
         "classification": classification,
         "ocr": ocr,
         "medical_extraction": medical_extraction,
+        "recommendations": recommendations,
     }
 
 

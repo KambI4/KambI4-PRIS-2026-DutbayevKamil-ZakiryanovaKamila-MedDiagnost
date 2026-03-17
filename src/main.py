@@ -43,11 +43,23 @@ with st.expander("Компьютерное зрение: OCR и классифи
             cls = result["classification"]
             ocr = result["ocr"]
             medical = result["medical_extraction"]
+            recommendations = result["recommendations"]
 
             st.subheader("Результат анализа")
             st.write(f"Тип изображения: **{cls['class_label']}**")
             st.write(f"Уверенность: **{cls['confidence']:.2f}**")
             st.json(cls["features"])
+
+            st.subheader("Гибридные рекомендации")
+            st.caption("Поиск похожих медицинских объектов по cosine similarity: визуальные признаки + OCR-текст.")
+            for item in recommendations:
+                st.markdown(
+                    f"**{item['label']}**  \n"
+                    f"Итоговая близость: `{item['score']:.2f}` | "
+                    f"Визуальная: `{item['visual_score']:.2f}` | "
+                    f"Текстовая: `{item['text_score']:.2f}`"
+                )
+                st.write(item["rationale"])
 
             st.subheader("OCR")
             if ocr["available"]:

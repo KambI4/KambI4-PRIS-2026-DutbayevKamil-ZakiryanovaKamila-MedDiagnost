@@ -3,7 +3,12 @@ import os
 import re
 from difflib import get_close_matches
 
-import spacy
+try:
+    import spacy
+except Exception:
+    spacy = None
+
+from similarity import recommend_similar_diseases
 
 
 RULES_PATH = os.path.normpath(
@@ -27,10 +32,10 @@ MONTHS = (
     "января|февраля|марта|апреля|мая|июня|июля|августа|"
     "сентября|октября|ноября|декабря"
 )
-DATE_PATTERN = re.compile(rf"\\b(\\d{{1,2}}\\s+(?:{MONTHS}))\\b", re.IGNORECASE)
+DATE_PATTERN = re.compile(rf"\b(\d{{1,2}}\s+(?:{MONTHS}))\b", re.IGNORECASE)
 
 try:
-    NLP = spacy.load("ru_core_news_sm")
+    NLP = spacy.load("ru_core_news_sm") if spacy is not None else None
 except Exception:
     NLP = None
 
@@ -45,8 +50,8 @@ def load_rules():
     if not os.path.exists(RULES_PATH):
         return default_rules
 
-    with open(RULES_PATH, "r", encoding="utf-8") as f:
-        return json.load(f)
+    with open(RULES_PATH, "r", encoding="utf-8") as file:
+        return json.load(file)
 
 
 def check_rules(data):
@@ -109,11 +114,11 @@ def _extract_candidates(query):
     candidates = [query_norm]
     candidates.extend(tokens)
 
-    for i in range(len(tokens)):
-        if i + 1 < len(tokens):
-            candidates.append(f"{tokens[i]} {tokens[i + 1]}")
-        if i + 2 < len(tokens):
-            candidates.append(f"{tokens[i]} {tokens[i + 1]} {tokens[i + 2]}")
+    for index in range(len(tokens)):
+        if index + 1 < len(tokens):
+            candidates.append(f"{tokens[index]} {tokens[index + 1]}")
+        if index + 2 < len(tokens):
+            candidates.append(f"{tokens[index]} {tokens[index + 1]} {tokens[index + 2]}")
 
     seen = set()
     uniq = []
@@ -158,11 +163,16 @@ def _extract_medical_entities(text, graph):
 
     found = []
     for node in graph.nodes:
-        node_tokens = node.lower().split()
+        node_tokens = str(node).lower().split()
         if any(token in lemmas for token in node_tokens):
             found.append(node)
 
     return list(set(found))
+
+
+def _format_disease_recommendations(recommendations):
+    formatted = ", ".join([f"{item['name']} ({item['score']:.2f})" for item in recommendations])
+    return f"Похожие заболевания по векторной близости: {formatted}."
 
 
 def process_text_message(text, graph):
@@ -187,13 +197,14 @@ def process_text_message(text, graph):
         matched_nodes = fuzzy_found
 
     response_parts = []
+    disease_recommendations = recommend_similar_diseases(query, graph)
 
     ner_entities = _extract_named_entities(query)
     for dt in _extract_dates(query):
         ner_entities.append((dt, "DATE"))
 
     if ner_entities:
-        formatted = ", ".join([f"{t} ({l})" for t, l in ner_entities])
+        formatted = ", ".join([f"{text_value} ({label})" for text_value, label in ner_entities])
         response_parts.append(f"Распознаны сущности: {formatted}.")
 
     nlp_medical = _extract_medical_entities(query, graph)
@@ -221,6 +232,8 @@ def process_text_message(text, graph):
                 else:
                     response_parts.append(f"{node}: пока нет связей.")
 
+        if disease_recommendations:
+            response_parts.append(_format_disease_recommendations(disease_recommendations))
         return "\n".join(response_parts)
 
     suggestions = _suggest_nodes(query, alias_index)
@@ -228,9 +241,18 @@ def process_text_message(text, graph):
         response_parts.append(
             f"Я не знаю такого термина. Возможно, вы имели в виду: {', '.join(suggestions)}."
         )
+        if disease_recommendations:
+            response_parts.append(
+                "Ближайшие заболевания по описанию симптомов: "
+                + ", ".join([f"{item['name']} ({item['score']:.2f})" for item in disease_recommendations])
+                + "."
+            )
         return "\n".join(response_parts)
 
     if response_parts:
         return "\n".join(response_parts)
 
-    return "Я не знаю такого термина"
+    if disease_recommendations:
+        return "Точного совпадения не найдено. " + _format_disease_recommendations(disease_recommendations)
+
+    return "Я не знаю такого термина."
