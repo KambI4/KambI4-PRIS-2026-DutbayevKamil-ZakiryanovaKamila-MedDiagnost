@@ -1,8 +1,8 @@
 import streamlit as st
 
 from knowledge_graph import load_graph
-from logic import process_text_message
-from vision import analyze_image_bytes, image_bytes_to_pil
+from pipeline import DiagnosisPipeline
+from vision import image_bytes_to_pil
 
 st.set_page_config(page_title="MedDiagnost Chat", page_icon="🩺", layout="wide")
 st.title("Медицинский чат-ассистент")
@@ -16,7 +16,11 @@ if "messages" not in st.session_state:
 if "graph" not in st.session_state:
     st.session_state.graph = load_graph()
 
+if "pipeline" not in st.session_state:
+    st.session_state.pipeline = DiagnosisPipeline()
+
 graph = st.session_state.graph
+pipeline = st.session_state.pipeline
 
 disease_nodes = sorted([n for n, attrs in graph.nodes(data=True) if attrs.get("type") == "disease"])
 symptom_nodes = sorted([n for n, attrs in graph.nodes(data=True) if attrs.get("type") == "symptom"])
@@ -39,11 +43,11 @@ with st.expander("Компьютерное зрение: OCR и классифи
         st.image(image_bytes_to_pil(image_bytes), caption=uploaded_file.name, use_container_width=True)
 
         try:
-            result = analyze_image_bytes(image_bytes)
-            cls = result["classification"]
-            ocr = result["ocr"]
-            medical = result["medical_extraction"]
-            recommendations = result["recommendations"]
+            image_result, diagnosis_result = pipeline.diagnose_from_image(image_bytes)
+            
+            cls = image_result.classification
+            ocr_text = image_result.ocr_text
+            recommendations = image_result.recommendations
 
             st.subheader("Результат анализа")
             st.write(f"Тип изображения: **{cls['class_label']}**")
@@ -62,46 +66,23 @@ with st.expander("Компьютерное зрение: OCR и классифи
                 st.write(item["rationale"])
 
             st.subheader("OCR")
-            if ocr["available"]:
-                if ocr["text"].strip():
-                    st.text_area("Извлеченный текст", ocr["text"], height=180)
+            if ocr_text.strip():
+                st.text_area("Извлеченный текст", ocr_text, height=180)
 
-                    st.subheader("Структурированный мед. разбор")
-                    if medical["diagnosis_candidates"]:
-                        st.markdown("**Предполагаемый диагноз / заключение:**")
-                        for item in medical["diagnosis_candidates"]:
-                            st.write(f"- {item}")
-                    else:
-                        st.write("Предполагаемый диагноз не выделен.")
-
-                    if medical["icd_codes"]:
-                        st.markdown(f"**МКБ-коды:** {', '.join(medical['icd_codes'])}")
-
-                    if medical["prescriptions"]:
-                        st.markdown("**Назначения:**")
-                        for idx, rx in enumerate(medical["prescriptions"], start=1):
-                            parts = [f"{idx}. {rx['line']}"]
-                            if rx["dosage"]:
-                                parts.append(f"доза: {rx['dosage']}")
-                            if rx["frequency"]:
-                                parts.append(f"частота: {rx['frequency']}")
-                            st.write(" | ".join(parts))
-                    else:
-                        st.write("Назначения не выделены.")
-
-                    if st.button("Отправить OCR-текст в мед. анализ", use_container_width=True):
-                        bot_response = process_text_message(ocr["text"], graph)
-                        st.session_state.messages.append(
-                            {
-                                "role": "assistant",
-                                "content": f"Анализ OCR-текста:\n{bot_response}",
-                            }
-                        )
+                if st.button("Отправить OCR-текст в мед. анализ", use_container_width=True):
+                    if diagnosis_result:
+                        response_text = f"Диагноз: {', '.join([c['name'] for c in diagnosis_result.primary_candidates])}\n"
+                        response_text += f"Симптомы: {', '.join(diagnosis_result.related_symptoms)}\n"
+                        response_text += f"Лекарства: {', '.join(diagnosis_result.recommended_medicines)}\n"
+                        response_text += f"Безопасность: {diagnosis_result.rules_check}"
+                        
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            "content": response_text,
+                        })
                         st.success("OCR-текст обработан и добавлен в диалог ниже.")
-                else:
-                    st.info("Текст на изображении не обнаружен.")
             else:
-                st.warning(ocr["message"])
+                st.info("Текст на изображении не обнаружен.")
         except Exception as exc:
             st.error(f"Ошибка анализа изображения: {exc}")
 
@@ -114,8 +95,17 @@ if user_input := st.chat_input("Введите симптом, болезнь и
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    bot_response = process_text_message(user_input, graph)
+    result = pipeline.diagnose_from_text(user_input)
+    
+    response = f"**Основные кандидаты:**\n"
+    for cand in result.primary_candidates:
+        response += f"- {cand['name']} ({cand.get('score', 0):.2f})\n"
+    
+    response += f"\n**Симптомы:** {', '.join(result.related_symptoms)}\n"
+    response += f"**Лекарства:** {', '.join(result.recommended_medicines)}\n"
+    response += f"**Уверенность:** {result.confidence}\n"
+    response += f"**Статус:** {result.rules_check}"
 
-    st.session_state.messages.append({"role": "assistant", "content": bot_response})
+    st.session_state.messages.append({"role": "assistant", "content": response})
     with st.chat_message("assistant"):
-        st.markdown(bot_response)
+        st.markdown(response)
