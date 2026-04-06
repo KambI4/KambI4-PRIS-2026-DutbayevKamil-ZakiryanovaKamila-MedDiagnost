@@ -5,4 +5,9 @@ networkx
 spacy
 opencv-python-headless
 easyocr
+fastapi
+uvicorn
+scikit-learn
+rapidfuzz
+pytest
 ru-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/ru_core_news_sm-3.7.0/ru_core_news_sm-3.7.0-py3-none-any.whl

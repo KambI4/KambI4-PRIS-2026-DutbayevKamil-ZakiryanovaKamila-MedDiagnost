@@ -1,17 +1,15 @@
+from __future__ import annotations
+
 import networkx as nx
 
-from models import Disease
+from src.data_loader import load_diseases_from_json
 
 
 def create_graph(diseases=None):
     graph = nx.Graph()
 
     if diseases is None:
-        diseases = [
-            Disease("Грипп", ["Температура", "Кашель", "Слабость"], ["Парацетамол"]),
-            Disease("COVID-19", ["Температура", "Головная боль", "Слабость"], ["Противовирусные"]),
-            Disease("Простуда", ["Кашель", "Слабость"], ["Ибупрофен"]),
-        ]
+        diseases = load_diseases_from_json()
 
     symptom_nodes = sorted({symptom for d in diseases for symptom in d.symptoms})
     medicine_nodes = sorted({medicine for d in diseases for medicine in d.medicines})
