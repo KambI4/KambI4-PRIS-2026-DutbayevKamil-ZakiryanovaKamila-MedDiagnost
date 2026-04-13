@@ -8,7 +8,7 @@ try:
 except Exception:
     spacy = None
 
-from similarity import recommend_similar_diseases
+from src.similarity import recommend_similar_diseases
 
 
 RULES_PATH = os.path.normpath(
@@ -34,10 +34,25 @@ MONTHS = (
 )
 DATE_PATTERN = re.compile(rf"\b(\d{{1,2}}\s+(?:{MONTHS}))\b", re.IGNORECASE)
 
-try:
-    NLP = spacy.load("ru_core_news_sm") if spacy is not None else None
-except Exception:
-    NLP = None
+NLP = None
+_NLP_INITIALIZED = False
+
+
+def _get_nlp():
+    global NLP, _NLP_INITIALIZED
+    if _NLP_INITIALIZED:
+        return NLP
+
+    _NLP_INITIALIZED = True
+    if spacy is None:
+        NLP = None
+        return NLP
+
+    try:
+        NLP = spacy.load("ru_core_news_sm")
+    except Exception:
+        NLP = None
+    return NLP
 
 
 def load_rules():
@@ -148,17 +163,19 @@ def _extract_dates(text):
 
 
 def _extract_named_entities(text):
-    if not NLP:
+    nlp = _get_nlp()
+    if not nlp:
         return []
-    doc = NLP(text)
+    doc = nlp(text)
     return [(ent.text, ent.label_) for ent in doc.ents]
 
 
 def _extract_medical_entities(text, graph):
-    if not NLP:
+    nlp = _get_nlp()
+    if not nlp:
         return []
 
-    doc = NLP(text.lower())
+    doc = nlp(text.lower())
     lemmas = [token.lemma_ for token in doc]
 
     found = []

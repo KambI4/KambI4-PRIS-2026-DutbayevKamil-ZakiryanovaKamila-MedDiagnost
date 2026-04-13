@@ -7,7 +7,7 @@ from typing import Any
 import numpy as np
 from PIL import Image
 
-from similarity import recommend_similar_medical_objects
+from src.similarity import recommend_similar_medical_objects
 
 try:
     import cv2

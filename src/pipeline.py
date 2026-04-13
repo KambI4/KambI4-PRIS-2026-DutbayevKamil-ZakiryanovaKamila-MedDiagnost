@@ -7,16 +7,16 @@ from dataclasses import dataclass, asdict
 from typing import List, Dict, Any, Optional
 from enum import Enum
 
-from knowledge_graph import load_graph
-from logic import (
+from src.knowledge_graph import load_graph
+from src.logic import (
     process_text_message,
     check_rules,
     _extract_named_entities,
     _extract_dates,
     _extract_medical_entities,
 )
-from vision import analyze_image_bytes
-from models import Disease
+from src.vision import analyze_image_bytes
+from src.models import Disease
 
 
 class DiagnosisConfidence(str, Enum):

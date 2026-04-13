@@ -22,3 +22,13 @@ def test_labeled_recommendation_uses_disease_profile():
     result = recommend_labeled_by_cosine("кашель температура", items, top_k=1)
     assert result[0][0] == "Грипп"
     assert result[0][1] > 0
+
+
+def test_recommendation_returns_empty_for_blank_query():
+    docs = ["Грипп", "COVID-19", "Простуда"]
+    assert recommend_by_cosine("   ", docs) == []
+    assert recommend_by_fuzzy("", docs) == []
+
+
+def test_labeled_recommendation_returns_empty_for_no_items():
+    assert recommend_labeled_by_cosine("кашель", [], top_k=2) == []
