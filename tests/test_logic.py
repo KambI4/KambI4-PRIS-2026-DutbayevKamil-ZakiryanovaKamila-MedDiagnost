@@ -26,6 +26,12 @@ def test_process_text_message_suggests_close_term():
     assert "Кашель" in response
 
 
+def test_process_text_message_matches_sore_throat_alias():
+    graph = load_graph()
+    response = process_text_message("болит горло", graph)
+    assert "Боль в горле" in response
+
+
 def test_check_rules_requires_registration(monkeypatch):
     monkeypatch.setattr(
         "src.logic.load_rules",
@@ -75,4 +81,17 @@ def test_check_rules_passes_safe_patient(monkeypatch):
         },
     )
     result = check_rules({"is_registered": True, "temperature": 36.8, "symptoms": ["кашель"]})
+    assert result == "Пациент прошел первичный осмотр"
+
+
+def test_check_rules_handles_missing_temperature(monkeypatch):
+    monkeypatch.setattr(
+        "src.logic.load_rules",
+        lambda: {
+            "critical_rules": {"must_be_registered": False},
+            "thresholds": {"max_temperature": 39.0},
+            "lists": {"danger_symptoms": []},
+        },
+    )
+    result = check_rules({"is_registered": True, "temperature": None, "symptoms": []})
     assert result == "Пациент прошел первичный осмотр"

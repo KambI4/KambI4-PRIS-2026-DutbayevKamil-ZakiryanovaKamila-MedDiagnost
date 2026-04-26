@@ -17,7 +17,5 @@ graph TD
     Reco --> Fuzzy[RapidFuzz / difflib]
 
     User --> CLI[CLI Interface]
-    User --> TG[Telegram Bot]
     CLI --> Service
-    TG --> Service
 ```

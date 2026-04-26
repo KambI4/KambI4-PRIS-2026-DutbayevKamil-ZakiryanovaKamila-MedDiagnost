@@ -17,15 +17,47 @@ RULES_PATH = os.path.normpath(
 
 ALIASES_BY_CANONICAL = {
     "Грипп": ["грип", "flu", "influenza"],
-    "COVID-19": ["covid", "covid19", "covid-19", "ковид", "ковид19", "коронавирус", "корона"],
     "Простуда": ["орви", "cold", "common cold"],
+    "Ангина": ["тонзиллит", "sore throat infection"],
+    "Бронхит": ["bronchitis"],
+    "Синусит": ["гайморит", "sinusitis"],
+    "Аллергия": ["аллергический ринит", "allergy"],
+    "Мигрень": ["migraine"],
+    "Головная боль напряжения": ["tension headache", "голова раскалывается от усталости"],
+    "Гастрит": ["gastritis", "желудок болит"],
+    "Кишечная инфекция": ["отравление", "food poisoning", "кишечное расстройство"],
+    "Отит": ["ear infection", "болит ухо"],
+    "Конъюнктивит": ["conjunctivitis", "покраснение глаз"],
+    "Цистит": ["cystitis", "мочу больно", "часто хожу в туалет"],
+    "Пневмония": ["pneumonia", "воспаление легких"],
     "Температура": ["жар", "лихорадка", "fever", "temperature"],
     "Кашель": ["кашел", "cough"],
-    "Головная боль": ["болит голова", "headache", "migraine"],
+    "Головная боль": ["болит голова", "голова болит", "headache", "migraine"],
+    "Боль в горле": ["болит горло", "горло", "першит горло", "sore throat", "throat pain"],
+    "Насморк": ["runny nose", "сопли", "заложенность носа", "заложен нос"],
+    "Чихание": ["sneezing", "чихаю"],
+    "Одышка": ["тяжело дышать", "нехватка воздуха", "shortness of breath", "breathlessness"],
+    "Озноб": ["морозит", "chills"],
+    "Боль в мышцах": ["ломота", "ломит тело", "body ache", "muscle pain"],
+    "Боль в груди": ["болит грудь", "грудная боль", "chest pain"],
+    "Зуд глаз": ["чешутся глаза", "зуд в глазах", "itchy eyes"],
+    "Тошнота": ["подташнивает", "тошнит", "nausea"],
+    "Боль в животе": ["болит живот", "живот болит", "stomach ache", "abdominal pain"],
+    "Боль в ухе": ["болит ухо", "стреляет в ухе", "ear pain"],
+    "Частое мочеиспускание": ["часто мочусь", "часто хожу в туалет", "частое мочеиспускание"],
+    "Боль внизу живота": ["болит низ живота", "тянет низ живота", "lower abdominal pain"],
+    "Изжога": ["жжение в груди", "heartburn"],
     "Слабость": ["упадок сил", "weakness", "fatigue"],
     "Парацетамол": ["paracetamol", "acetaminophen", "тайленол"],
     "Ибупрофен": ["ibuprofen", "нурофен"],
-    "Противовирусные": ["антивирусные", "antiviral", "antivirals"],
+    "Амоксициллин": ["amoxicillin"],
+    "Азитромицин": ["azithromycin"],
+    "Амброксол": ["ambroxol", "лазолван"],
+    "Лоратадин": ["loratadine", "кларитин"],
+    "Омепразол": ["omeprazole"],
+    "Солевой спрей": ["спрей для носа", "назальный спрей", "saline spray"],
+    "Регидрон": ["rehydration", "электролиты"],
+    "Фосфомицин": ["fosfomycin", "монурал"],
 }
 
 MONTHS = (
@@ -71,11 +103,12 @@ def load_rules():
 
 def check_rules(data):
     rules = load_rules()
+    temperature = data.get("temperature")
 
     if rules["critical_rules"]["must_be_registered"] and not data.get("is_registered", False):
         return "Пациент не зарегистрирован"
 
-    if data.get("temperature", 0) > rules["thresholds"]["max_temperature"]:
+    if temperature is not None and temperature > rules["thresholds"]["max_temperature"]:
         return "Очень высокая температура"
 
     for symptom in data.get("symptoms", []):
@@ -176,12 +209,16 @@ def _extract_medical_entities(text, graph):
         return []
 
     doc = nlp(text.lower())
-    lemmas = [token.lemma_ for token in doc]
+    lemmas = {_normalize_text(token.lemma_) for token in doc if token.lemma_.strip()}
 
     found = []
     for node in graph.nodes:
-        node_tokens = str(node).lower().split()
-        if any(token in lemmas for token in node_tokens):
+        canonical_norm = _normalize_text(node)
+        alias_tokens = re.findall(r"[a-zA-Zа-яА-Я0-9]+", canonical_norm)
+        if canonical_norm in _normalize_text(text):
+            found.append(node)
+            continue
+        if alias_tokens and all(token in lemmas for token in alias_tokens if len(token) > 2):
             found.append(node)
 
     return list(set(found))

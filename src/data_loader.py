@@ -16,7 +16,15 @@ def load_diseases_from_json(path: Path | None = None) -> list[Disease]:
         payload = json.load(f)
 
     return [
-        Disease(name=item["name"], symptoms=item["symptoms"], medicines=item["medicines"])
+        Disease(
+            name=item["name"],
+            symptoms=item["symptoms"],
+            medicines=item["medicines"],
+            severity=item.get("severity", "medium"),
+            urgency=item.get("urgency", "plan"),
+            advice=item.get("advice", []),
+            when_to_seek_help=item.get("when_to_seek_help", []),
+        )
         for item in payload
     ]
 
